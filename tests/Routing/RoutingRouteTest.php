@@ -12,11 +12,13 @@ use Illuminate\Contracts\Routing\Registrar;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Routing\Contracts\PolymorphicRouteBinding;
 use Illuminate\Routing\Controller;
 use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Illuminate\Routing\Middleware\SubstituteBindings;
@@ -51,19 +53,25 @@ class RoutingRouteTest extends TestCase
         $this->assertSame('hello', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
 
         $router = $this->getRouter();
-        $router->get('foo/bar', ['domain' => 'api.{name}.bar', function ($name) {
-            return $name;
-        }]);
-        $router->get('foo/bar', ['domain' => 'api.{name}.baz', function ($name) {
-            return $name;
-        }]);
+        $router->get('foo/bar', [
+            'domain' => 'api.{name}.bar', function ($name) {
+                return $name;
+            },
+        ]);
+        $router->get('foo/bar', [
+            'domain' => 'api.{name}.baz', function ($name) {
+                return $name;
+            },
+        ]);
         $this->assertSame('taylor', $router->dispatch(Request::create('http://api.taylor.bar/foo/bar', 'GET'))->getContent());
         $this->assertSame('dayle', $router->dispatch(Request::create('http://api.dayle.baz/foo/bar', 'GET'))->getContent());
 
         $router = $this->getRouter();
-        $router->get('foo/{age}', ['domain' => 'api.{name}.bar', function ($name, $age) {
-            return $name.$age;
-        }]);
+        $router->get('foo/{age}', [
+            'domain' => 'api.{name}.bar', function ($name, $age) {
+                return $name . $age;
+            },
+        ]);
         $this->assertSame('taylor25', $router->dispatch(Request::create('http://api.taylor.bar/foo/25', 'GET'))->getContent());
 
         $router = $this->getRouter();
@@ -84,19 +92,19 @@ class RoutingRouteTest extends TestCase
 
         $router = $this->getRouter();
         $router->get('foo/{bar}/{baz?}', function ($name, $age = 25) {
-            return $name.$age;
+            return $name . $age;
         });
         $this->assertSame('taylor25', $router->dispatch(Request::create('foo/taylor', 'GET'))->getContent());
 
         $router = $this->getRouter();
         $router->get('foo/{name}/boom/{age?}/{location?}', function ($name, $age = 25, $location = 'AR') {
-            return $name.$age.$location;
+            return $name . $age . $location;
         });
         $this->assertSame('taylor30AR', $router->dispatch(Request::create('foo/taylor/boom/30', 'GET'))->getContent());
 
         $router = $this->getRouter();
         $router->get('{bar}/{baz?}', function ($name, $age = 25) {
-            return $name.$age;
+            return $name . $age;
         });
         $this->assertSame('taylor25', $router->dispatch(Request::create('taylor', 'GET'))->getContent());
 
@@ -108,9 +116,11 @@ class RoutingRouteTest extends TestCase
         $this->assertSame('30', $router->dispatch(Request::create('30', 'GET'))->getContent());
 
         $router = $this->getRouter();
-        $router->get('{foo?}/{baz?}', ['as' => 'foo', function ($name = 'taylor', $age = 25) {
-            return $name.$age;
-        }]);
+        $router->get('{foo?}/{baz?}', [
+            'as' => 'foo', function ($name = 'taylor', $age = 25) {
+                return $name . $age;
+            },
+        ]);
         $this->assertSame('taylor25', $router->dispatch(Request::create('/', 'GET'))->getContent());
         $this->assertSame('fred25', $router->dispatch(Request::create('fred', 'GET'))->getContent());
         $this->assertSame('fred30', $router->dispatch(Request::create('fred/30', 'GET'))->getContent());
@@ -127,9 +137,11 @@ class RoutingRouteTest extends TestCase
         $this->assertSame('oxygen%20', $router->dispatch(Request::create('http://test.com/foo/oxygen%2520', 'GET'))->getContent());
 
         $router = $this->getRouter();
-        $router->patch('foo/bar', ['as' => 'foo', function () {
-            return 'bar';
-        }]);
+        $router->patch('foo/bar', [
+            'as' => 'foo', function () {
+                return 'bar';
+            },
+        ]);
         $this->assertSame('bar', $router->dispatch(Request::create('foo/bar', 'PATCH'))->getContent());
         $this->assertSame('foo', $router->currentRouteName());
 
@@ -161,9 +173,11 @@ class RoutingRouteTest extends TestCase
         $this->assertSame('hello', $router->dispatch(Request::create('foo/bar/%C3%A5%CE%B1%D1%84', 'GET'))->getContent());
 
         $router = $this->getRouter();
-        $router->get('foo/bar', ['boom' => 'auth', function () {
-            return 'closure';
-        }]);
+        $router->get('foo/bar', [
+            'boom' => 'auth', function () {
+                return 'closure';
+            },
+        ]);
         $this->assertSame('closure', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
     }
 
@@ -187,9 +201,11 @@ class RoutingRouteTest extends TestCase
         $middleware = function ($request, $next) {
             return 'caught';
         };
-        $router->get('foo/bar', ['middleware' => $middleware, function () {
-            return 'hello';
-        }]);
+        $router->get('foo/bar', [
+            'middleware' => $middleware, function () {
+                return 'hello';
+            },
+        ]);
         $this->assertSame('caught', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
     }
 
@@ -198,9 +214,11 @@ class RoutingRouteTest extends TestCase
         $router = $this->getRouter();
         $router->aliasMiddleware('web', RoutingTestMiddlewareGroupTwo::class);
 
-        $router->get('foo/bar', ['middleware' => 'web', function () {
-            return 'hello';
-        }])->withoutMiddleware(RoutingTestMiddlewareGroupTwo::class);
+        $router->get('foo/bar', [
+            'middleware' => 'web', function () {
+                return 'hello';
+            },
+        ])->withoutMiddleware(RoutingTestMiddlewareGroupTwo::class);
 
         $this->assertEquals('hello', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
     }
@@ -224,9 +242,11 @@ class RoutingRouteTest extends TestCase
         $middleware = function ($request, $next) {
             return 'caught';
         };
-        $router->get('foo/bar', ['middleware' => $middleware, function () {
-            throw new HttpResponseException(new Response('hello'));
-        }]);
+        $router->get('foo/bar', [
+            'middleware' => $middleware, function () {
+                throw new HttpResponseException(new Response('hello'));
+            },
+        ]);
         $response = $router->dispatch(Request::create('foo/bar', 'GET'))->getContent();
         $this->assertSame('caught', $response);
 
@@ -238,11 +258,13 @@ class RoutingRouteTest extends TestCase
         $middleware = function ($request, $next) use ($response) {
             $this->assertSame($response, $next($request));
 
-            return new Response($response->getContent().' caught');
+            return new Response($response->getContent() . ' caught');
         };
-        $router->get('foo/bar', ['middleware' => $middleware, function () use ($response) {
-            throw new HttpResponseException($response);
-        }]);
+        $router->get('foo/bar', [
+            'middleware' => $middleware, function () use ($response) {
+                throw new HttpResponseException($response);
+            },
+        ]);
 
         $response = $router->dispatch(Request::create('foo/bar', 'GET'))->getContent();
         $this->assertSame('hello caught', $response);
@@ -252,7 +274,7 @@ class RoutingRouteTest extends TestCase
     {
         $router = $this->getRouter();
         $router->get('foo/bar', [
-            'uses' => RouteTestClosureMiddlewareController::class.'@index',
+            'uses' => RouteTestClosureMiddlewareController::class . '@index',
             'middleware' => ['foo', 'bar', 'baz'],
         ]);
         $router->aliasMiddleware('foo', function ($request, $next) {
@@ -273,9 +295,11 @@ class RoutingRouteTest extends TestCase
     public function testDefinedClosureMiddleware()
     {
         $router = $this->getRouter();
-        $router->get('foo/bar', ['middleware' => 'foo', function () {
-            return 'hello';
-        }]);
+        $router->get('foo/bar', [
+            'middleware' => 'foo', function () {
+                return 'hello';
+            },
+        ]);
         $router->aliasMiddleware('foo', function ($request, $next) {
             return 'caught';
         });
@@ -286,7 +310,7 @@ class RoutingRouteTest extends TestCase
     {
         $router = $this->getRouter();
         $router->get('foo/bar', [
-            'uses' => RouteTestClosureMiddlewareController::class.'@index',
+            'uses' => RouteTestClosureMiddlewareController::class . '@index',
             'middleware' => 'foo',
         ]);
         $router->aliasMiddleware('foo', function ($request, $next) {
@@ -327,24 +351,26 @@ class RoutingRouteTest extends TestCase
     public function testFluentRoutingWithControllerAction()
     {
         $router = $this->getRouter();
-        $router->get('foo/bar')->uses(RouteTestControllerStub::class.'@index');
+        $router->get('foo/bar')->uses(RouteTestControllerStub::class . '@index');
         $this->assertSame('Hello World', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
 
         $router = $this->getRouter();
         $router->group(['namespace' => 'App'], function ($router) {
-            $router->get('foo/bar')->uses(RouteTestControllerStub::class.'@index');
+            $router->get('foo/bar')->uses(RouteTestControllerStub::class . '@index');
         });
         $action = $router->getRoutes()->getRoutes()[0]->getAction();
-        $this->assertSame('App\\'.RouteTestControllerStub::class.'@index', $action['controller']);
+        $this->assertSame('App\\' . RouteTestControllerStub::class . '@index', $action['controller']);
     }
 
     public function testMiddlewareGroups()
     {
         unset($_SERVER['__middleware.group']);
         $router = $this->getRouter();
-        $router->get('foo/bar', ['middleware' => 'web', function () {
-            return 'hello';
-        }]);
+        $router->get('foo/bar', [
+            'middleware' => 'web', function () {
+                return 'hello';
+            },
+        ]);
 
         $router->aliasMiddleware('two', RoutingTestMiddlewareGroupTwo::class);
         $router->middlewareGroup('web', [RoutingTestMiddlewareGroupOne::class, 'two:taylor']);
@@ -359,9 +385,11 @@ class RoutingRouteTest extends TestCase
     {
         unset($_SERVER['__middleware.group']);
         $router = $this->getRouter();
-        $router->get('foo/bar', ['middleware' => 'web', function () {
-            return 'hello';
-        }]);
+        $router->get('foo/bar', [
+            'middleware' => 'web', function () {
+                return 'hello';
+            },
+        ]);
 
         $router->aliasMiddleware('two', RoutingTestMiddlewareGroupTwo::class);
         $router->middlewareGroup('first', ['two:abigail']);
@@ -571,10 +599,10 @@ class RoutingRouteTest extends TestCase
     public function testRouteParametersDefaultValue()
     {
         $router = $this->getRouter();
-        $router->get('foo/{bar?}', ['uses' => RouteTestControllerWithParameterStub::class.'@returnParameter'])->defaults('bar', 'foo');
+        $router->get('foo/{bar?}', ['uses' => RouteTestControllerWithParameterStub::class . '@returnParameter'])->defaults('bar', 'foo');
         $this->assertSame('foo', $router->dispatch(Request::create('foo', 'GET'))->getContent());
 
-        $router->get('foo/{bar?}', ['uses' => RouteTestControllerWithParameterStub::class.'@returnParameter'])->defaults('bar', 'foo');
+        $router->get('foo/{bar?}', ['uses' => RouteTestControllerWithParameterStub::class . '@returnParameter'])->defaults('bar', 'foo');
         $this->assertSame('bar', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
 
         $router->get('foo/{bar?}', function ($bar = '') {
@@ -589,41 +617,41 @@ class RoutingRouteTest extends TestCase
 
         // Has one argument but receives two
         unset($_SERVER['__test.controller_callAction_parameters']);
-        $router->get(($str = Str::random()).'/{one}/{two}', RouteTestAnotherControllerWithParameterStub::class.'@oneArgument');
-        $router->dispatch(Request::create($str.'/one/two', 'GET'));
+        $router->get(($str = Str::random()) . '/{one}/{two}', RouteTestAnotherControllerWithParameterStub::class . '@oneArgument');
+        $router->dispatch(Request::create($str . '/one/two', 'GET'));
         $this->assertEquals(['one' => 'one', 'two' => 'two'], $_SERVER['__test.controller_callAction_parameters']);
 
         // Has two arguments and receives two
         unset($_SERVER['__test.controller_callAction_parameters']);
-        $router->get(($str = Str::random()).'/{one}/{two}', RouteTestAnotherControllerWithParameterStub::class.'@twoArguments');
-        $router->dispatch(Request::create($str.'/one/two', 'GET'));
+        $router->get(($str = Str::random()) . '/{one}/{two}', RouteTestAnotherControllerWithParameterStub::class . '@twoArguments');
+        $router->dispatch(Request::create($str . '/one/two', 'GET'));
         $this->assertEquals(['one' => 'one', 'two' => 'two'], $_SERVER['__test.controller_callAction_parameters']);
 
         // Has two arguments but with different names from the ones passed from the route
         unset($_SERVER['__test.controller_callAction_parameters']);
-        $router->get(($str = Str::random()).'/{one}/{two}', RouteTestAnotherControllerWithParameterStub::class.'@differentArgumentNames');
-        $router->dispatch(Request::create($str.'/one/two', 'GET'));
+        $router->get(($str = Str::random()) . '/{one}/{two}', RouteTestAnotherControllerWithParameterStub::class . '@differentArgumentNames');
+        $router->dispatch(Request::create($str . '/one/two', 'GET'));
         $this->assertEquals(['one' => 'one', 'two' => 'two'], $_SERVER['__test.controller_callAction_parameters']);
 
         // Has two arguments with same name but argument order is reversed
         unset($_SERVER['__test.controller_callAction_parameters']);
-        $router->get(($str = Str::random()).'/{one}/{two}', RouteTestAnotherControllerWithParameterStub::class.'@reversedArguments');
-        $router->dispatch(Request::create($str.'/one/two', 'GET'));
+        $router->get(($str = Str::random()) . '/{one}/{two}', RouteTestAnotherControllerWithParameterStub::class . '@reversedArguments');
+        $router->dispatch(Request::create($str . '/one/two', 'GET'));
         $this->assertEquals(['one' => 'one', 'two' => 'two'], $_SERVER['__test.controller_callAction_parameters']);
 
         // No route parameters while method has parameters
         unset($_SERVER['__test.controller_callAction_parameters']);
-        $router->get(($str = Str::random()).'', RouteTestAnotherControllerWithParameterStub::class.'@oneArgument');
+        $router->get(($str = Str::random()) . '', RouteTestAnotherControllerWithParameterStub::class . '@oneArgument');
         $router->dispatch(Request::create($str, 'GET'));
         $this->assertEquals([], $_SERVER['__test.controller_callAction_parameters']);
 
         // With model bindings
         unset($_SERVER['__test.controller_callAction_parameters']);
-        $router->get(($str = Str::random()).'/{user}/{defaultNull?}/{team?}', [
+        $router->get(($str = Str::random()) . '/{user}/{defaultNull?}/{team?}', [
             'middleware' => SubstituteBindings::class,
-            'uses' => RouteTestAnotherControllerWithParameterStub::class.'@withModels',
+            'uses' => RouteTestAnotherControllerWithParameterStub::class . '@withModels',
         ]);
-        $router->dispatch(Request::create($str.'/1', 'GET'));
+        $router->dispatch(Request::create($str . '/1', 'GET'));
 
         $values = array_values($_SERVER['__test.controller_callAction_parameters']);
 
@@ -671,9 +699,11 @@ class RoutingRouteTest extends TestCase
         $this->expectException(NotFoundHttpException::class);
 
         $router = $this->getRouter();
-        $router->get('foo/bar', ['domain' => 'api.foo.bar', function () {
-            return 'hello';
-        }]);
+        $router->get('foo/bar', [
+            'domain' => 'api.foo.bar', function () {
+                return 'hello';
+            },
+        ]);
         $this->assertSame('hello', $router->dispatch(Request::create('http://api.baz.boom/foo/bar', 'GET'))->getContent());
     }
 
@@ -722,57 +752,73 @@ class RoutingRouteTest extends TestCase
          * Domain checks
          */
         $request = Request::create('http://something.foo.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['domain' => '{foo}.foo.com', function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'domain' => '{foo}.foo.com', function () {
+                //
+            },
+        ]);
         $this->assertTrue($route->matches($request));
 
         $request = Request::create('http://something.bar.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['domain' => '{foo}.foo.com', function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'domain' => '{foo}.foo.com', function () {
+                //
+            },
+        ]);
         $this->assertFalse($route->matches($request));
 
         /*
          * HTTPS checks
          */
         $request = Request::create('https://foo.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['https', function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'https', function () {
+                //
+            },
+        ]);
         $this->assertTrue($route->matches($request));
 
         $request = Request::create('https://foo.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['https', 'baz' => true, function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'https', 'baz' => true, function () {
+                //
+            },
+        ]);
         $this->assertTrue($route->matches($request));
 
         $request = Request::create('http://foo.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['https', function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'https', function () {
+                //
+            },
+        ]);
         $this->assertFalse($route->matches($request));
 
         /*
          * HTTP checks
          */
         $request = Request::create('https://foo.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['http', function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'http', function () {
+                //
+            },
+        ]);
         $this->assertFalse($route->matches($request));
 
         $request = Request::create('http://foo.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['http', function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'http', function () {
+                //
+            },
+        ]);
         $this->assertTrue($route->matches($request));
 
         $request = Request::create('http://foo.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['baz' => true, function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'baz' => true, function () {
+                //
+            },
+        ]);
         $this->assertTrue($route->matches($request));
     }
 
@@ -793,9 +839,11 @@ class RoutingRouteTest extends TestCase
         $this->assertFalse($route->matches($request));
 
         $request = Request::create('foo/123abc', 'GET');
-        $route = new Route('GET', 'foo/{bar}', ['where' => ['bar' => '[0-9]+'], function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar}', [
+            'where' => ['bar' => '[0-9]+'], function () {
+                //
+            },
+        ]);
         $route->where('bar', '[0-9]+');
         $this->assertFalse($route->matches($request));
 
@@ -810,9 +858,11 @@ class RoutingRouteTest extends TestCase
         $this->assertTrue($route->matches($request));
 
         $request = Request::create('foo/123', 'GET');
-        $route = new Route('GET', 'foo/{bar?}', ['where' => ['bar' => '[0-9]+'], function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/{bar?}', [
+            'where' => ['bar' => '[0-9]+'], function () {
+                //
+            },
+        ]);
         $route->where('bar', '[0-9]+');
         $this->assertTrue($route->matches($request));
 
@@ -840,9 +890,11 @@ class RoutingRouteTest extends TestCase
 
     public function testRoutePrefixParameterParsing()
     {
-        $route = new Route('GET', '/foo', ['prefix' => 'profiles/{user:username}/portfolios', 'uses' => function () {
-            //
-        }]);
+        $route = new Route('GET', '/foo', [
+            'prefix' => 'profiles/{user:username}/portfolios', 'uses' => function () {
+                //
+            },
+        ]);
 
         $this->assertSame('profiles/{user}/portfolios/foo', $route->uri());
     }
@@ -869,9 +921,11 @@ class RoutingRouteTest extends TestCase
     public function testRouteBinding()
     {
         $router = $this->getRouter();
-        $router->get('foo/{bar}', ['middleware' => SubstituteBindings::class, 'uses' => function ($name) {
-            return $name;
-        }]);
+        $router->get('foo/{bar}', [
+            'middleware' => SubstituteBindings::class, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
         $router->bind('bar', function ($value) {
             return strtoupper($value);
         });
@@ -881,9 +935,11 @@ class RoutingRouteTest extends TestCase
     public function testRouteClassBinding()
     {
         $router = $this->getRouter();
-        $router->get('foo/{bar}', ['middleware' => SubstituteBindings::class, 'uses' => function ($name) {
-            return $name;
-        }]);
+        $router->get('foo/{bar}', [
+            'middleware' => SubstituteBindings::class, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
         $router->bind('bar', RouteBindingStub::class);
         $this->assertSame('TAYLOR', $router->dispatch(Request::create('foo/taylor', 'GET'))->getContent());
     }
@@ -891,10 +947,12 @@ class RoutingRouteTest extends TestCase
     public function testRouteClassMethodBinding()
     {
         $router = $this->getRouter();
-        $router->get('foo/{bar}', ['middleware' => SubstituteBindings::class, 'uses' => function ($name) {
-            return $name;
-        }]);
-        $router->bind('bar', RouteBindingStub::class.'@find');
+        $router->get('foo/{bar}', [
+            'middleware' => SubstituteBindings::class, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
+        $router->bind('bar', RouteBindingStub::class . '@find');
         $this->assertSame('dragon', $router->dispatch(Request::create('foo/Dragon', 'GET'))->getContent());
     }
 
@@ -913,9 +971,11 @@ class RoutingRouteTest extends TestCase
 
         $router->middlewarePriority = [ExampleMiddlewareContract::class, Authenticate::class, SubstituteBindings::class, Authorize::class];
 
-        $route = $router->get('foo', ['middleware' => $middleware, 'uses' => function ($name) {
-            return $name;
-        }]);
+        $route = $router->get('foo', [
+            'middleware' => $middleware, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
 
         $this->assertEquals([
             Placeholder1::class,
@@ -930,9 +990,11 @@ class RoutingRouteTest extends TestCase
     public function testModelBinding()
     {
         $router = $this->getRouter();
-        $router->get('foo/{bar}', ['middleware' => SubstituteBindings::class, 'uses' => function ($name) {
-            return $name;
-        }]);
+        $router->get('foo/{bar}', [
+            'middleware' => SubstituteBindings::class, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
         $router->model('bar', RouteModelBindingStub::class);
         $this->assertSame('TAYLOR', $router->dispatch(Request::create('foo/taylor', 'GET'))->getContent());
     }
@@ -943,9 +1005,11 @@ class RoutingRouteTest extends TestCase
         $this->expectExceptionMessage('No query results for model [Illuminate\Tests\Routing\RouteModelBindingNullStub].');
 
         $router = $this->getRouter();
-        $router->get('foo/{bar}', ['middleware' => SubstituteBindings::class, 'uses' => function ($name) {
-            return $name;
-        }]);
+        $router->get('foo/{bar}', [
+            'middleware' => SubstituteBindings::class, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
         $router->model('bar', RouteModelBindingNullStub::class);
         $router->dispatch(Request::create('foo/taylor', 'GET'))->getContent();
     }
@@ -953,9 +1017,11 @@ class RoutingRouteTest extends TestCase
     public function testModelBindingWithCustomNullReturn()
     {
         $router = $this->getRouter();
-        $router->get('foo/{bar}', ['middleware' => SubstituteBindings::class, 'uses' => function ($name) {
-            return $name;
-        }]);
+        $router->get('foo/{bar}', [
+            'middleware' => SubstituteBindings::class, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
         $router->model('bar', RouteModelBindingNullStub::class, function () {
             return 'missing';
         });
@@ -965,9 +1031,11 @@ class RoutingRouteTest extends TestCase
     public function testModelBindingWithBindingClosure()
     {
         $router = $this->getRouter();
-        $router->get('foo/{bar}', ['middleware' => SubstituteBindings::class, 'uses' => function ($name) {
-            return $name;
-        }]);
+        $router->get('foo/{bar}', [
+            'middleware' => SubstituteBindings::class, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
         $router->model('bar', RouteModelBindingNullStub::class, function ($value) {
             return (new RouteModelBindingClosureStub)->findAlternate($value);
         });
@@ -997,11 +1065,33 @@ class RoutingRouteTest extends TestCase
             return $router;
         });
         $container->bind(RouteModelInterface::class, RouteModelBindingStub::class);
-        $router->get('foo/{bar}', ['middleware' => SubstituteBindings::class, 'uses' => function ($name) {
-            return $name;
-        }]);
+        $router->get('foo/{bar}', [
+            'middleware' => SubstituteBindings::class, 'uses' => function ($name) {
+                return $name;
+            },
+        ]);
         $router->model('bar', RouteModelInterface::class);
         $this->assertSame('TAYLOR', $router->dispatch(Request::create('foo/taylor', 'GET'))->getContent());
+    }
+
+    public function testPolymorphicRouteBindingWithMorphMap()
+    {
+        Relation::morphMap([
+            'user' => RoutingTestUserModel::class,
+        ]);
+
+        $router = $this->getRouter();
+        $router->resource('foo-bar', RouteTestResourceControllerWithPolymorphicModelParameter::class, ['middleware' => SubstituteBindings::class]);
+        $this->assertSame('12345', $router->dispatch(Request::create('foo-bar/user@12345', 'GET'))->getContent());
+    }
+
+    public function testPolymorphicRouteBindingWithoutMorphMap()
+    {
+        $parameter = RoutingTestUserModel::class . '@12345';
+
+        $router = $this->getRouter();
+        $router->resource('foo-bar', RouteTestResourceControllerWithPolymorphicModelParameter::class, ['middleware' => SubstituteBindings::class]);
+        $this->assertSame('12345', $router->dispatch(Request::create("foo-bar/{$parameter}", 'GET'))->getContent());
     }
 
     public function testGroupMerging()
@@ -1016,14 +1106,18 @@ class RoutingRouteTest extends TestCase
         $this->assertEquals(['as' => 'foo.bar', 'prefix' => null, 'namespace' => null, 'where' => []], RouteGroup::merge(['as' => 'bar'], $old));
 
         $old = ['where' => ['var1' => 'foo', 'var2' => 'bar']];
-        $this->assertEquals(['prefix' => null, 'namespace' => null, 'where' => [
-            'var1' => 'foo', 'var2' => 'baz', 'var3' => 'qux',
-        ]], RouteGroup::merge(['where' => ['var2' => 'baz', 'var3' => 'qux']], $old));
+        $this->assertEquals([
+            'prefix' => null, 'namespace' => null, 'where' => [
+                'var1' => 'foo', 'var2' => 'baz', 'var3' => 'qux',
+            ],
+        ], RouteGroup::merge(['where' => ['var2' => 'baz', 'var3' => 'qux']], $old));
 
         $old = [];
-        $this->assertEquals(['prefix' => null, 'namespace' => null, 'where' => [
-            'var1' => 'foo', 'var2' => 'bar',
-        ]], RouteGroup::merge(['where' => ['var1' => 'foo', 'var2' => 'bar']], $old));
+        $this->assertEquals([
+            'prefix' => null, 'namespace' => null, 'where' => [
+                'var1' => 'foo', 'var2' => 'bar',
+            ],
+        ], RouteGroup::merge(['where' => ['var1' => 'foo', 'var2' => 'bar']], $old));
     }
 
     public function testRouteGrouping()
@@ -1064,7 +1158,7 @@ class RoutingRouteTest extends TestCase
     public function testCurrentRouteUses()
     {
         $router = $this->getRouter();
-        $router->get('foo/bar', ['as' => 'foo.bar', 'uses' => RouteTestControllerStub::class.'@index']);
+        $router->get('foo/bar', ['as' => 'foo.bar', 'uses' => RouteTestControllerStub::class . '@index']);
 
         $this->assertNull($router->currentRouteAction());
 
@@ -1076,14 +1170,14 @@ class RoutingRouteTest extends TestCase
         $this->assertTrue($router->uses(['*BarController*', '*FooController*'], '*RouteTestControllerStub*'));
         $this->assertFalse($router->uses(['*BarController*', '*FooController*']));
 
-        $this->assertEquals($router->currentRouteAction(), RouteTestControllerStub::class.'@index');
-        $this->assertTrue($router->currentRouteUses(RouteTestControllerStub::class.'@index'));
+        $this->assertEquals($router->currentRouteAction(), RouteTestControllerStub::class . '@index');
+        $this->assertTrue($router->currentRouteUses(RouteTestControllerStub::class . '@index'));
     }
 
     public function testRouteGroupingFromFile()
     {
         $router = $this->getRouter();
-        $router->group(['prefix' => 'api'], __DIR__.'/fixtures/routes.php');
+        $router->group(['prefix' => 'api'], __DIR__ . '/fixtures/routes.php');
 
         $route = last($router->getRoutes()->get());
         $request = Request::create('api/users', 'GET');
@@ -1096,9 +1190,11 @@ class RoutingRouteTest extends TestCase
     {
         $router = $this->getRouter();
         $router->group(['prefix' => 'foo', 'as' => 'Foo::'], function () use ($router) {
-            $router->get('bar', ['as' => 'bar', function () {
-                return 'hello';
-            }]);
+            $router->get('bar', [
+                'as' => 'bar', function () {
+                    return 'hello';
+                },
+            ]);
         });
         $routes = $router->getRoutes();
         $route = $routes->getByName('Foo::bar');
@@ -1113,9 +1209,11 @@ class RoutingRouteTest extends TestCase
         $router = $this->getRouter();
         $router->group(['prefix' => 'foo', 'as' => 'Foo::'], function () use ($router) {
             $router->group(['prefix' => 'bar', 'as' => 'Bar::'], function () use ($router) {
-                $router->get('baz', ['as' => 'baz', function () {
-                    return 'hello';
-                }]);
+                $router->get('baz', [
+                    'as' => 'baz', function () {
+                        return 'hello';
+                    },
+                ]);
             });
         });
         $routes = $router->getRoutes();
@@ -1128,9 +1226,11 @@ class RoutingRouteTest extends TestCase
         $router = $this->getRouter();
         $router->group(['prefix' => 'foo', 'as' => 'Foo::'], function () use ($router) {
             $router->group(['prefix' => 'bar'], function () use ($router) {
-                $router->prefix('foz')->get('baz', ['as' => 'baz', function () {
-                    return 'hello';
-                }]);
+                $router->prefix('foz')->get('baz', [
+                    'as' => 'baz', function () {
+                        return 'hello';
+                    },
+                ]);
             });
         });
         $routes = $router->getRoutes();
@@ -1145,9 +1245,11 @@ class RoutingRouteTest extends TestCase
          */
         $router = $this->getRouter();
         $router->group(['prefix' => 'foo', 'as' => 'Foo::'], function () use ($router) {
-            $router->prefix('bar')->get('baz', ['as' => 'baz', function () {
-                return 'hello';
-            }]);
+            $router->prefix('bar')->get('baz', [
+                'as' => 'baz', function () {
+                    return 'hello';
+                },
+            ]);
         });
         $routes = $router->getRoutes();
         $route = $routes->getByName('Foo::baz');
@@ -1467,10 +1569,12 @@ class RoutingRouteTest extends TestCase
         $this->assertTrue($router->getRoutes()->hasNamedRoute('foo.bar.destroy'));
 
         $router = $this->getRouter();
-        $router->resource('foo', 'FooController', ['names' => [
-            'index' => 'foo',
-            'show' => 'bar',
-        ]]);
+        $router->resource('foo', 'FooController', [
+            'names' => [
+                'index' => 'foo',
+                'show' => 'bar',
+            ],
+        ]);
 
         $this->assertTrue($router->getRoutes()->hasNamedRoute('foo'));
         $this->assertTrue($router->getRoutes()->hasNamedRoute('bar'));
@@ -1499,9 +1603,11 @@ class RoutingRouteTest extends TestCase
         });
 
         $request = Request::create('http://foo.com/foo/bar', 'GET');
-        $route = new Route('GET', 'foo/bar', ['http', function () {
-            //
-        }]);
+        $route = new Route('GET', 'foo/bar', [
+            'http', function () {
+                //
+            },
+        ]);
 
         $_SERVER['__router.request'] = null;
         $_SERVER['__router.route'] = null;
@@ -1543,7 +1649,7 @@ class RoutingRouteTest extends TestCase
 
         $router = $this->getRouter();
 
-        $router->get('foo/bar', RouteTestControllerStub::class.'@index');
+        $router->get('foo/bar', RouteTestControllerStub::class . '@index');
 
         $this->assertSame('Hello World', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
         $this->assertTrue($_SERVER['route.test.controller.middleware']);
@@ -1572,15 +1678,15 @@ class RoutingRouteTest extends TestCase
         $this->assertEquals(['foo', 'bar'], $_SERVER['route.test.controller.middleware.parameters.two']);
         $this->assertFalse(isset($_SERVER['route.test.controller.except.middleware']));
         $action = $router->getRoutes()->getRoutes()[0]->getAction()['controller'];
-        $this->assertEquals(RouteTestControllerStub::class.'@index', $action);
+        $this->assertEquals(RouteTestControllerStub::class . '@index', $action);
     }
 
     public function testCallableControllerRouting()
     {
         $router = $this->getRouter();
 
-        $router->get('foo/bar', RouteTestControllerCallableStub::class.'@bar');
-        $router->get('foo/baz', RouteTestControllerCallableStub::class.'@baz');
+        $router->get('foo/bar', RouteTestControllerCallableStub::class . '@bar');
+        $router->get('foo/baz', RouteTestControllerCallableStub::class . '@baz');
 
         $this->assertSame('bar', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
         $this->assertSame('baz', $router->dispatch(Request::create('foo/baz', 'GET'))->getContent());
@@ -1600,7 +1706,7 @@ class RoutingRouteTest extends TestCase
             RouteTestControllerMiddlewareTwo::class,
         ]);
 
-        $router->get('foo/bar', RouteTestControllerMiddlewareGroupStub::class.'@index');
+        $router->get('foo/bar', RouteTestControllerMiddlewareGroupStub::class . '@index');
 
         $this->assertSame('caught', $router->dispatch(Request::create('foo/bar', 'GET'))->getContent());
         $this->assertTrue($_SERVER['route.test.controller.middleware']);
@@ -1633,7 +1739,7 @@ class RoutingRouteTest extends TestCase
                 $this->assertInstanceOf(RoutingTestUserModel::class, $user);
                 $this->assertInstanceOf(RoutingTestPostModel::class, $post);
 
-                return $user->value.'|'.$post->value;
+                return $user->value . '|' . $post->value;
             },
         ]);
 
@@ -1650,7 +1756,7 @@ class RoutingRouteTest extends TestCase
                 $this->assertInstanceOf(RoutingTestUserModel::class, $user);
                 $this->assertInstanceOf(RoutingTestTeamModel::class, $testTeam);
 
-                return $user->value.'|'.$testTeam->value;
+                return $user->value . '|' . $testTeam->value;
             },
         ]);
 
@@ -1923,8 +2029,8 @@ class RouteTestControllerStub extends Controller
     public function __construct()
     {
         $this->middleware(RouteTestControllerMiddleware::class);
-        $this->middleware(RouteTestControllerParameterizedMiddlewareOne::class.':0');
-        $this->middleware(RouteTestControllerParameterizedMiddlewareTwo::class.':foo,bar');
+        $this->middleware(RouteTestControllerParameterizedMiddlewareOne::class . ':0');
+        $this->middleware(RouteTestControllerParameterizedMiddlewareTwo::class . ':foo,bar');
         $this->middleware(RouteTestControllerExceptMiddleware::class, ['except' => 'index']);
     }
 
@@ -2004,6 +2110,14 @@ class RouteTestResourceControllerWithModelParameter extends Controller
     }
 }
 
+class RouteTestResourceControllerWithPolymorphicModelParameter extends Controller
+{
+    public function show(RoutingTestModelInterface $fooBar)
+    {
+        return $fooBar->value;
+    }
+}
+
 class RouteTestClosureMiddlewareController extends Controller
 {
     public function __construct()
@@ -2012,7 +2126,7 @@ class RouteTestClosureMiddlewareController extends Controller
             $response = $next($request);
 
             return $response->setContent(
-                $response->content().'-'.$request['foo-middleware'].'-controller-closure'
+                $response->content() . '-' . $request['foo-middleware'] . '-controller-closure'
             );
         });
     }
@@ -2136,7 +2250,7 @@ class RouteModelBindingClosureStub
 {
     public function findAlternate($value)
     {
-        return strtolower($value).'alt';
+        return strtolower($value) . 'alt';
     }
 }
 
@@ -2154,11 +2268,16 @@ class RoutingTestMiddlewareGroupTwo
 {
     public function handle($request, $next, $parameter = null)
     {
-        return new Response('caught '.$parameter);
+        return new Response('caught ' . $parameter);
     }
 }
 
-class RoutingTestUserModel extends Model
+interface RoutingTestModelInterface extends PolymorphicRouteBinding
+{
+    public function getValue();
+}
+
+class RoutingTestUserModel extends Model implements RoutingTestModelInterface
 {
     public function posts()
     {
@@ -2190,6 +2309,11 @@ class RoutingTestUserModel extends Model
     public function firstOrFail()
     {
         return $this;
+    }
+
+    public function getValue()
+    {
+        return $this->value;
     }
 }
 

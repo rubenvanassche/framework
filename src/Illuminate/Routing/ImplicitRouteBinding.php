@@ -4,6 +4,8 @@ namespace Illuminate\Routing;
 
 use Illuminate\Contracts\Routing\UrlRoutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Routing\Contracts\PolymorphicRouteBinding;
 use Illuminate\Support\Reflector;
 use Illuminate\Support\Str;
 
@@ -12,8 +14,9 @@ class ImplicitRouteBinding
     /**
      * Resolve the implicit route bindings for the given route.
      *
-     * @param  \Illuminate\Container\Container  $container
-     * @param  \Illuminate\Routing\Route  $route
+     * @param \Illuminate\Container\Container $container
+     * @param \Illuminate\Routing\Route $route
+     *
      * @return void
      *
      * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
@@ -22,7 +25,7 @@ class ImplicitRouteBinding
     {
         $parameters = $route->parameters();
 
-        foreach ($route->signatureParameters(UrlRoutable::class) as $parameter) {
+        foreach ($route->signatureParameters([UrlRoutable::class, PolymorphicRouteBinding::class]) as $parameter) {
             if (! $parameterName = static::getParameterName($parameter->getName(), $parameters)) {
                 continue;
             }
@@ -33,7 +36,15 @@ class ImplicitRouteBinding
                 continue;
             }
 
-            $instance = $container->make(Reflector::getParameterClassName($parameter));
+            $parameterReflection = Reflector::getParameterClassName($parameter);
+
+            if(static::isPolymorphic($parameterReflection)){
+                [$model, $parameterValue] = explode('@', $parameterValue);
+
+                $parameterReflection = Relation::getMorphedModel($model) ?? $model;
+            }
+
+            $instance = $container->make($parameterReflection);
 
             $parent = $route->parentOfParameter($parameterName);
 
@@ -54,8 +65,9 @@ class ImplicitRouteBinding
     /**
      * Return the parameter name if it exists in the given parameters.
      *
-     * @param  string  $name
-     * @param  array  $parameters
+     * @param string $name
+     * @param array $parameters
+     *
      * @return string|null
      */
     protected static function getParameterName($name, $parameters)
@@ -67,5 +79,11 @@ class ImplicitRouteBinding
         if (array_key_exists($snakedName = Str::snake($name), $parameters)) {
             return $snakedName;
         }
+    }
+
+    protected static function isPolymorphic($parameterReflection): bool
+    {
+        return interface_exists($parameterReflection) &&
+            in_array(PolymorphicRouteBinding::class, class_implements($parameterReflection));
     }
 }
